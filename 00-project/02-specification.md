@@ -150,8 +150,8 @@ A workspace may contain:
 - workspace identity and instructions;
 - source files;
 - sessions and forks;
-- question sets;
-- attempts/results;
+- named session question sets and optional Question Bank collections;
+- attempts/results linked to their questions and sets;
 - plans and plan history;
 - notes;
 - mind maps;
@@ -184,11 +184,11 @@ This table is the compact acceptance-oriented index for the detailed behavior de
 | FR-01 | Must | Persistent Study Workspaces | A learner can create/reopen a workspace and its sources, sessions, questions, attempts, plans, notes, mind maps, and settings remain available. |
 | FR-02 | Must | Multiple sessions and forks | A learner can resume sessions and fork from a chosen point without changing the original branch. |
 | FR-03 | Must | Source/file management | AI and learner can manage permitted files/sources without requiring duplicate uploads, and same-named files remain distinguishable. |
-| FR-04 | Must | Question-set management | AI can create/edit/reorder/archive MCQ and short-answer questions/sets, including hints, with stable identity and revision history. |
-| FR-05 | Must | MCQ practice lifecycle | MCQ sets can be paused/resumed/submitted/retried; deterministic scores and previous attempts remain available. |
-| FR-06 | Must | Short-answer practice lifecycle | Partial or complete answers can be submitted to AI; feedback is source-aware, saved with the attempt, and can express uncertainty. |
+| FR-04 | Must | Session question sets | AI and learner can create, solve, revise, organise and reference named question sets in sessions independently of Question Bank membership, with stable IDs and revision history. |
+| FR-05 | Must | MCQ practice lifecycle | Learner can answer in chat or a focused view, pause/resume/retry, and see deterministic scores and prior attempts attached to the same questions/sets. |
+| FR-06 | Must | Short-answer practice lifecycle | Text responses and supported attachments may be saved/submitted; criterion-based AI feedback, uncertainty and previous attempts stay linked to each question, not mixed with optional AI solutions. |
 | FR-07 | Must | Source traceability/change awareness | Questions can retain source references; when relevant source content changes, dependent questions can be identified as needing re-check/update. |
-| FR-08 | Must | Chat/object linking | A user can open a stored object from chat and jump from an object to its originating/relevant chat message where available. |
+| FR-08 | Must | Chat/object linking | A learner can solve, edit and reference a question from chat or Questions; both views access the same object and may return to its originating session. |
 | FR-09 | Must | Plans and history | Multiple plans can be created, edited, completed, archived, reopened, and accessed from later sessions. |
 | FR-10 | Must | Permission hierarchy | Workspace defaults and session overrides govern AI access/actions, including full-access, controlled, read-only, and custom behavior. |
 | FR-11 | Must | AI/model portability | Different scopes may use different models/providers and the active model can change mid-session without losing application-owned state. |
@@ -200,7 +200,10 @@ This table is the compact acceptance-oriented index for the detailed behavior de
 | FR-17 | Should | Interactive mind maps | AI can create interactive mind maps that may remain local, be saved, referenced, and exported. |
 | FR-18 | Should | Skills/tools/web configuration | Capabilities can be configured globally and enabled/restricted per workspace/session. |
 | FR-19 | Should | Cross-workspace planning/calendar | Coordinator can use permitted high-level workspace state to coordinate deadlines and study plans across subjects. |
-| FR-20 | Should | Context-efficient stored-object rendering | Existing stored objects can be rendered by reference without forcing the model to regenerate their full text solely for display. |
+| FR-20 | Must | Context-efficient stored-object rendering | The UI renders existing questions by stable reference; retrieval, targeted edits and concise tool responses avoid repeating unchanged content. |
+| FR-21 | Must | Optional Question Bank curation | Learner or explicitly instructed AI can add a whole named set or selected questions to the bank while retaining set identity, original session links and other non-selected sets outside the bank. |
+| FR-22 | Must | Precise AI question edits | Permitted AI actions can change a field, portion, question or selected set without replacing unaffected content; revision conflicts and invalid edits are rejected with actionable errors. |
+| FR-23 | Should | Learning from attempt history | AI can review relevant per-question attempts and feedback to identify possible weak topics and suggest further teaching or practice, without treating scores as proof of mastery. |
 
 ---
 
@@ -517,44 +520,51 @@ Workspace sources are the normal study basis. Web/tool knowledge may supplement 
 
 ## 7. Questions and question sets
 
-### 7.1 Question sets
+### 7.1 Session question sets and the optional Question Bank
 
-Questions are organized into persistent **Question Sets**.
+AI or the learner can create one or more **named Question Sets** in a study session. Each set has a stable ID, title, workspace, originating session and an ordered membership of identifiable questions. Sets from different sessions stay separate unless the learner explicitly combines them.
 
-AI may, subject to permissions:
+A generated question or set is usable **immediately**, inside its chat or a dedicated question/practice view. It can be opened, answered, discussed, referenced, edited, retried and revisited without first entering the Question Bank. It is saved as an application-owned study object, not just copied message text; it remains accessible from its session later.
 
-- create a set;
-- add questions;
-- edit a question;
-- edit multiple questions;
-- remove/archive questions;
-- reorder questions;
-- add/remove hints;
-- generate a replacement set;
-- generate a follow-up set based on previous results.
+The **Question Bank** is an optional, organised selection for easier future access, **not** the automatic destination of every generated question. The learner can:
 
-No mandatory per-question approval flow is required.
+- add a complete named set to the bank;
+- select only certain questions from a set, preserving their relation to the original set and session;
+- keep separate sets separate, including when many sets originate in one session;
+- browse sets from sessions that have not been collected in the bank;
+- remove a set or question from the bank without deleting the original question, session or its attempts;
+- use the same actions by directly interacting with the UI or by explicitly instructing AI, within active permissions.
 
-### 7.2 Initial question types
+**Adding to the bank is the learner's selection/acceptance for bank inclusion.** It can be performed in one step for a whole set or a selection, without a mandatory per-question approval screen, review queue or extra approval clicks. A general AI permission profile alone does **not** automatically collect every generated set in the bank. If permission policy requires confirmation for an AI-initiated action, that policy still applies.
 
-The initial required types are:
+Bank collections refer to the canonical questions rather than silently creating unrelated copies. A curated subset keeps its own bank entry/selection and links to the source set and session. Titles and ordering remain clear and editable. AI and learner may perform bulk question/set edits, reordering, hint changes, and archive/removal actions subject to permissions.
 
-- **Multiple-choice questions (MCQ)**
-- **Short-answer / QA questions**
+### 7.2 Initial question types and minimal answer data
 
-The data model may later support additional types.
+The first required types are **Multiple-choice (MCQ)** and **Short-answer / QA**; other question forms can be added later without forcing them into the first implementation.
 
-### 7.3 Question identity and revision
+- **MCQ:** save the options and correct answer(s), so scoring can be deterministic. A full explanation or worked solution is optional.
+- **Short-answer:** save a compact reference answer or expected result and assessment criteria, with suitable supporting material for evaluation; do not routinely generate long worked solutions.
+- **On demand:** the learner may solve the question, ask AI to solve it, request hints, or ask for a detailed explanation. Optional AI solutions are saved separately from the reference answer and learner attempts.
+- **Visibility:** an answer key may be hidden during practice without deleting it from storage. A saved question need not have a learner attempt yet.
 
-A question should retain:
+Study-material-based questions retain a traceable reference to the supporting source/version. Ordinary tutor conversation need not cite a source on every turn.
 
-- stable question ID;
-- containing set ID;
-- revision/version;
-- source references where applicable;
-- creation/origin information.
+### 7.3 Question identity, precise edits and revision
 
-If a question is edited after appearing in an old chat message, the application should be able to distinguish the historical revision from the current revision.
+Each question should retain:
+
+- stable question ID and question revision;
+- containing/originating set and session IDs, with bank membership tracked separately;
+- source references and source versions when applicable;
+- origin, timestamp and relevant permissions/lock state;
+- answer-key/criteria revision where scoring depends on it.
+
+The learner and permitted AI can edit a **part of a field, a full field, a whole question or a selected group of questions**. A compact editing interface, analogous to a targeted patch, should not require resending or rewriting unchanged questions. It is an operation on canonical structured data, not fragile blind text replacement.
+
+The application must resolve exact IDs and expected revisions, validate field/type constraints and permissions, and apply changes atomically. On an invalid target, conflicting revision or bad input, it should reject the change and return a short actionable error so AI can correct the request. Significant edits must remain recoverable. An edit that changes possible answers must trigger consistency checks on stored correct answers and evaluation criteria.
+
+Earlier attempts and solutions remain linked to the **question revision they used**, even if the current question changes. Rendering an old chat message may show that it refers to an earlier revision and offer the current question.
 
 ### 7.4 Hints
 
@@ -579,13 +589,11 @@ For MCQ sets, the learner can:
 - retry the set;
 - review previous attempts.
 
-MCQ correctness should be evaluated deterministically from the stored answer key.
-
-AI is not required for each individual MCQ selection.
+MCQ correctness should be evaluated deterministically from the stored answer key and question revision. The learner may answer in chat or the focused practice view against the same stored question; no AI call is required for each selection.
 
 ### 7.6 MCQ post-attempt AI interaction
 
-After a set is submitted, the system may provide the AI with a compact representation of:
+After a set is submitted, the system may provide the AI with a compact, permission-checked representation of the linked attempts (rather than full chat history):
 
 - incorrect questions;
 - selected answers;
@@ -602,63 +610,63 @@ The AI can then:
 - create another targeted question set;
 - update a plan if permitted.
 
-### 7.7 Short-answer attempts
+### 7.7 Short-answer submissions
 
 For short-answer sets, the learner can:
 
-- answer one or more questions;
-- save progress;
-- submit only the completed portion;
-- continue later;
-- submit the complete set.
+- answer one or more questions inside chat or a focused question/practice view;
+- save an unfinished response, submit only completed answers, or continue later;
+- submit **text and/or attached files** using a common submission model;
+- request a separate AI explanation or worked solution, with no requirement to generate it alongside every question.
 
-AI evaluates submitted answers using the question context, expected criteria, and relevant sources.
+The first implementation targets text responses and supported text-extractable sources/attachments. Storing an attachment does not imply that every file format, image, handwriting or equation is automatically understood or assessable; unsupported evaluation paths must be made clear.
 
-The system should support uncertainty rather than forcing a confident judgment when evidence is insufficient.
+AI evaluates submitted answers against saved criteria and available relevant sources, cites evidence when needed and can report uncertainty. Learner answers and AI-produced worked solutions are distinct records. An AI solution never overwrites a learner submission.
 
-### 7.8 Retry/history
+### 7.8 Attempts, AI solutions and learning progress
 
-Every attempt can retain useful history such as:
+Each learner attempt is associated with an exact question ID **and revision**, and (where applicable) the set and practice run through which it was answered. It may keep response text/attachment references, submission/completion state, time, hint use, score and feedback.
 
-- time;
-- answers;
-- score/result;
-- AI feedback;
-- hints used;
-- completion status.
+- **Repeated attempts** add history; they do not replace an earlier attempt.
+- **AI solutions/explanations** are optional, independently saved records associated with the same question/revision and relevant session. Multiple solutions or different methods can coexist with learner attempts and the compact reference answer.
+- **Question and set views** show the relevant attempts, results and AI solutions in context; a separate standalone progress module is not required.
+- **Cross-session discussion** can reference exact questions, attempts or AI solutions without manually copying them; the user can compare methods or ask follow-up questions.
+- **AI progress assistance** may inspect authorised, relevant attempt summaries and weak-topic patterns to suggest lessons, plans or practice. It must distinguish observed attempts from unverified claims about learning mastery.
 
-The user can revisit earlier attempts and retry a set without overwriting previous history.
+The same saved attempt history is available when opening a question from its original session or from the Question Bank. Removing an item from the bank does not erase the attempts or session history.
 
 ### 7.9 Source dependencies and changes
 
-Questions generated from study material should retain enough provenance to identify the source material they depend on.
+Questions generated from study material should retain enough provenance to identify the relevant source material/version.
 
-If a relevant source is edited, replaced, or removed, the application should be able to identify affected questions and mark them for re-check, regeneration, or update rather than silently assuming the old question remains valid. A mandatory manual approval step is not required; the AI may update affected questions when permissions allow, while preserving revision history.
+If a relevant source changes, the application can flag affected questions, bank entries and related answer keys for re-check or regeneration. It must not silently assume an earlier reference answer is still correct.
 
-If a requested question set cannot be assembled from suitable existing questions, the system should either generate appropriate new questions or clearly adapt the requested set rather than silently returning an incomplete result.
+AI may suggest or make permitted, versioned edits to affected questions; historical question revisions and attempts remain intact. Source changes do not automatically delete questions or silently collect unselected questions into the bank. Where a selected bank question becomes outdated, its status remains visible until the issue is addressed.
 
----
+If a requested question set cannot be assembled from suitable existing questions, the system should either generate appropriate new questions or clearly explain/adapt the request rather than silently returning an incomplete result.
 
 ## 8. Chat ↔ object interaction
 
-### 8.1 Questions inside chat
+### 8.1 Questions are interactive in chat
 
-When AI creates or modifies a question set during conversation, the UI should render a clean interactive representation.
+When AI creates one or several named question sets, chat should show readable compact cards or an expandable grid rather than flooding the conversation with full question text.
 
 Example:
 
 ```text
-Created: Week 3 Practice
-12 questions
-
-[Open Question Set]
+Week 3 — Linear Algebra · 12 questions
+[Open] [Practise] [Add to Question Bank]
 ```
 
-Selecting it opens the exact set in the Questions area.
+Opening the card can expose individual questions, answer controls, explanations, source references, relevant earlier attempts and editing actions. The learner can solve and discuss a question **without leaving the conversation**; a focused full-screen practice view remains available when useful.
+
+The same canonical stored object appears in chat, the originating session, Question Set views and (if selected) the Question Bank. The user should never have to choose where an edit "really" belongs. The current object and relevant history stay in sync across views.
+
+A named set does **not** have to be transferred to the Question Bank to be usable or to persist.
 
 ### 8.2 Object references in chat
 
-The user can reference exact study objects instead of manually copying their text.
+The user can reference exact questions, named sets, source passages, previous learner attempts, or optional AI solutions across permitted sessions without manually copying their text.
 
 Examples:
 
@@ -692,19 +700,17 @@ Slash actions may expose commands, skills, and quick resource actions such as:
 /search
 ```
 
-The final command set is a UX decision. In general, `@` addresses an entity/capability and `/` invokes an action, skill, or quick resource workflow.
+The final command set is a UX decision. In general, `@` addresses an entity/capability and `/` invokes an action, skill, or quick resource workflow. AI should have permission-checked tools for the same question operations available in the UI: open/reference, answer or generate a solution, edit precisely, organise a set, select items for the Question Bank, and remove bank membership. A learner's explicit instruction to add questions to the bank counts as selection; ordinary question generation does not.
 
-### 8.4 Context-efficient object rendering
+### 8.4 Context- and token-efficient object interaction
 
-If a stored question or other object already exists, the AI should not be required to regenerate the entire object's text merely to display it again.
+The application can render canonical questions and other saved objects from stable references; AI does not need to regenerate their text simply to display them. When AI needs to inspect or change an object, it receives a compact index or selected relevant fields/versions first and fetches more detail only when needed.
 
-The AI/harness can return a reference to the stored object and the UI renders the canonical content.
+Changes should use a small targeted edit/patch interface with stable IDs and version checks instead of full-object rewrites. Tool responses should be concise: affected IDs, changed revisions, success/failure and actionable validation errors. Both **input context** and **output/tool-feedback tokens** should be limited without concealing failures or needed evidence.
 
-When the AI needs to reason about that object, the harness retrieves the necessary content into model context.
+### 8.5 Tutoring and study plans
 
-This preserves correctness while reducing unnecessary repeated input/output.
-
----
+The learner can ask AI to **teach, demonstrate, explain and answer follow-up questions** as many times as needed before choosing to practise. AI can support the learner's own study plan or suggest adjustments based on permitted materials and observed attempts. Learning is not required to begin or end with generating questions.
 
 ## 9. Plans and planning history
 
@@ -1152,9 +1158,9 @@ Significant AI edits or destructive operations should be recoverable or protecte
 
 ### NFR-06 — Context efficiency
 
-The application should avoid unnecessary repeated loading or generation of large stored content.
+The application should avoid unnecessary input-context loading, full-object rewrites, excessive model output and verbose tool-feedback responses. Targeted object retrieval and version-checked edits must not compromise correctness.
 
-**Verification:** compare representative workflows with object referencing/selective retrieval versus full repetition.
+**Verification:** compare input and output tokens, latency, validity of small edits and recovery from invalid/conflicting tool calls versus workflows that repeat full objects or chat history.
 
 ### NFR-07 — Model portability
 
@@ -1236,44 +1242,56 @@ Plan mode must not mutate persistent state, even when the active permission prof
 ### BR-15
 An optional semantic decision/routing layer cannot grant permissions or bypass the active operating mode.
 
+### BR-16
+Session-created questions and titled sets are usable and persistent independently of Question Bank membership. No automatic bank transfer occurs through generation or practice.
+
+### BR-17
+The Question Bank is a learner-selected collection. The learner's add action or explicit instruction to AI is the acceptance for inclusion, including multi-question selection; no separate mandatory per-question approval screen is required. Active tool permissions remain enforced.
+
+### BR-18
+Chat and Question Bank must refer to shared canonical question identity; bank removal does not automatically delete the source set, question or attempt history.
+
+### BR-19
+Learner attempts and optional AI solutions must not overwrite one another; records retain their question revision and remain navigable from the relevant question/set.
+
+### BR-20
+AI edits must validate exact targets, expected revisions, active permissions and scoring consistency before committing partial or bulk changes.
+
 ---
 
 ## 20. Main user journeys
 
 ### Journey A — Start a new subject
 
-1. Learner or Coordinator creates a workspace.
-2. Learner uploads or selects source files.
-3. Sources are added to the workspace without unnecessary re-upload/duplication.
-4. AI inspects relevant material.
-5. AI creates an initial study plan or practice set.
-6. Learner begins a session.
+1. Learner or Coordinator creates a Study Workspace.
+2. Learner adds/selects course material.
+3. AI helps the learner understand a topic through explanations and follow-up discussion.
+4. Learner follows an existing study plan or asks AI to suggest one.
+5. Learner may generate a named question set and practise when ready; it remains in the session whether or not it is added to the bank.
 
 ### Journey B — Practice with MCQs
 
-1. Learner opens a question set.
-2. Answers some/all questions.
-3. Can leave and resume later.
-4. Submits the set.
-5. Application scores it deterministically.
-6. Results/history are saved.
-7. AI can receive a compact result summary and continue teaching or generate targeted follow-up questions.
+1. Learner opens a named question set inside chat or from the Question Bank.
+2. Answers some or all questions, pauses and resumes later if needed.
+3. Submits responses; the application scores against stored keys deterministically.
+4. Each attempt is linked to the questions and their revisions; retries preserve previous attempts.
+5. Learner can request AI explanation or compare a prior AI solution without overwriting their own answer.
+6. AI may receive a compact attempt summary to suggest further teaching or targeted practice.
 
 ### Journey C — Short-answer practice
 
-1. Learner opens a QA set.
-2. Answers some questions.
-3. Saves/leaves or submits current answers.
-4. AI evaluates submitted content with relevant source context.
-5. Feedback is saved with the attempt.
-6. Learner can continue, retry, or discuss exact answers in chat.
+1. Learner opens a question in chat or its focused view, answers in text or uses a supported attachment.
+2. Learner saves progress, submits part of the set or returns later.
+3. AI evaluates against the saved reference criteria and relevant source context, expressing uncertainty where appropriate.
+4. Feedback remains attached to that particular attempt and question revision.
+5. Learner may request an optional AI worked solution and compare approaches in later sessions.
 
 ### Journey D — Ask about a question
 
-1. Learner references a question/answer/option from Questions.
-2. Chat receives the exact object reference.
-3. Harness retrieves relevant question/source/attempt context.
-4. AI explains or teaches without the learner manually copying text.
+1. Learner references a saved question, option, attempt or solution from a chat or set view, including an earlier session.
+2. Harness retrieves the exact permitted object/revision and only necessary source or attempt context.
+3. AI explains or teaches without needing the learner to copy the complete old conversation.
+4. AI can make precise, permission-checked edits to the question when requested.
 
 ### Journey E — Fork an investigation
 
@@ -1307,11 +1325,19 @@ An optional semantic decision/routing layer cannot grant permissions or bypass t
 3. Harness supplies relevant context to the new model.
 4. Conversation continues without recreating questions/plans/files.
 
+### Journey I — Curate a Question Bank
+
+1. AI generates **Set A** and **Set B** in one study session; both remain independently named and usable there.
+2. Learner practises, discusses or edits their questions directly in chat.
+3. Learner selects all of Set A and three chosen questions from Set B for the bank, either with UI controls or an explicit instruction to AI.
+4. Bank entries preserve their sets/selected-subset identity and original session links without creating disconnected question copies.
+5. Learner can browse uncollected session sets and collect more questions later; prior learner attempts and AI solutions remain linked.
+
 ---
 
 ## 21. Open questions and risks
 
-There are no blocking functional questions before supervisor review, but the following risks should be controlled during scoping and Phase 2:
+The main functional interaction direction is specified for supervisor review. The technical decisions remain provisional, and the following risks should be controlled during implementation:
 
 - **Scope size:** the full vision is intentionally broader than the minimum assigned exercise application; Semester-2 implementation must prioritize a coherent core rather than shallowly implementing every extension.
 - **AI variability:** model quality and provider capabilities differ, so application-owned state and deterministic rules must not depend on one model behaving perfectly.
@@ -1319,6 +1345,8 @@ There are no blocking functional questions before supervisor review, but the fol
 - **Context/retrieval mistakes:** selective retrieval can omit relevant material; the system needs traceability and recoverable access to original content.
 - **Cross-workspace access:** global coordination is powerful but must respect explicit isolation and memory/library permissions.
 - **Source evolution:** source updates can invalidate dependent questions or explanations and therefore require dependency/change awareness.
+- **Bank selection versus academic review:** selecting a question for the Question Bank serves as learner acceptance for inclusion; the supervisor should confirm whether this satisfies the assigned brief's use of "approve" without a separate quality-check gate.
+- **Precise edit contracts:** the patch interface, validation/repair feedback and version conflicts must be tested against actual chosen runtime APIs.
 
 ---
 
@@ -1338,13 +1366,13 @@ The purpose of supervisor feedback is to validate the direction and suggest scop
 
 # Phase 2 — Initial Technical Specification Proposal
 
-> **Proposed direction, not a finalized implementation design.** The initial goal is to reuse the existing AI runtime while building a separate, study-specific application and interface. Technology choices that have not been validated remain candidates.
+> **Status: initial proposal, not a completed or validated technical design.** The initial goal is to reuse the existing AI runtime while building a separate, study-specific application and interface. Technology choices that have not been validated remain candidates.
 
 ## Proposed solution
 
 A responsive web application will provide the learner-facing experience. Its UI will be developed independently of DeepSeek Harness's existing interface. The study application will own its domain logic and persistent objects, while **DeepSeek Harness** is the first-choice runtime for model interaction, streaming, sessions, tools, and context management. **Pi** is the runtime fallback.
 
-The product must still implement its own study-specific behavior: source/document versions; topic and study-unit links; editable question drafts and **explicit approval before entry into the exercise bank**; question validation and near-duplicate handling; deterministic MCQ scoring; criterion-based, uncertainty-aware short-answer feedback; saved attempts; source-change impact analysis; and reproducible question-set assembly. Existing harness features do not replace these responsibilities.
+The product must still own its study-specific behavior: source/document versions; named, session-owned question sets; optional learner-curated Question Bank membership (selection for inclusion, not a separate approval screen); precise question editing; correct-answer/criteria consistency; deterministic MCQ scoring; short-answer feedback; separate learner attempts and optional AI solutions; source-change awareness; and question-set assembly. Existing harness features do not replace these responsibilities.
 
 ## Technology direction
 
@@ -1357,6 +1385,8 @@ The product must still implement its own study-specific behavior: source/documen
 | Frontend–runtime integration | Prefer DeepSeek's native typed Client/API Gateway and event streams; thin server-side adapter if needed | Avoid adding a second protocol without a demonstrated need | Verify a standalone Next.js client can consume the selected interfaces safely; AG-UI is not an initial requirement |
 | Model providers | Harness-managed, configurable adapters | Application state remains independent of any single model/provider | Only providers supported and tested by the chosen integration can be promised |
 | Persistent study data | Application-owned relational data store (PostgreSQL candidate; SQLite acceptable for a prototype), with separate file storage | Stable identity, revision history, saved attempts and source dependencies | Schema, storage hosting and authentication still to be selected |
+| Question operations | Application-owned structured question/set services exposed to AI through a compact edit/patch tool | Fine-grained edit, revision checks, bank selection and useful short tool results | Validate precise edits and batch selection against actual harness tool behavior |
+| Attempts and solutions | Independent question-revision-linked learner attempts, reference answers and optional AI solutions | Keep answers, retry history and multiple approaches separate | Choose attachment processing and safe assessment boundaries for the prototype |
 | Source grounding | Versioned document processing and selective retrieval with source references | Compare full-source versus retrieved-context generation without losing traceability | Retrieval quality, changed-source invalidation, cost and latency |
 | Rendering and workspace tooling | Streaming Markdown renderer such as Streamdown when needed; pnpm for packages | Text, code and mathematical content; manageable TypeScript dependencies | Test mixed RTL/LTR rendering; a monorepo tool such as Turborepo is optional |
 
@@ -1375,19 +1405,25 @@ flowchart LR
 
 ```
 
-Study services own approval policy, deterministic scoring, question-bank state and source dependencies. The harness manages AI execution. Access-control checks must be enforced in application/runtime code, not only in prompts.
+Study services own canonical questions, set memberships and bank selections, learner attempts, optional AI solutions, deterministic scoring, revision validation and source dependencies. The harness manages AI execution, but AI tools must act through permission-checked application services, not unvalidated text output. Access-control checks must be enforced in code, not only in prompts.
+
+### Proposed question-operation boundary (to validate)
+
+Expose a small, general-purpose question/set interface to AI: find/read compact object state; edit a selected field/section or whole object using a targeted patch; curate bank membership; and access the relevant attempts/solutions. The tool/backend resolves stable IDs, expected revisions, permissions and type-dependent answer consistency; failed operations return short, correctable errors. This is a **behavioral design**, not a verified DeepSeek Harness API contract. An integration spike must check whether this can be implemented without unnecessary adapters.
+
+Question sets originate in sessions and retain title, ordering and identity. The optional Question Bank stores selected membership/references instead of disconnected copies. Answers or solutions created by AI are separate from learner attempts; source-linked reference answers/criteria are stored as needed for assessment. Full worked solutions are generated on demand. Input retrieval, output edits and tool feedback should all be measured for token use.
 
 ## Feasibility, evaluation and technical risks
 
 | Risk / assumption | Validation planned for Semester 2 | Fallback approach |
 | --- | --- | --- |
-| DeepSeek can power a standalone custom frontend | End-to-end spike: session creation, prompt streaming, cancellation, resume, model switching and tool/approval events | Use a thin secure server adapter; evaluate Pi if runtime integration proves unsuitable |
-| Study data remains correct when AI fails or a session changes | Persist and reload questions, approvals, attempts and source versions; test failure/retry paths | Keep deterministic application services and storage independent from model execution |
-| Grounded questions are reliable and traceable | Compare full-document and retrieved-excerpt generation for answerability, correctness, repetition, editing effort, latency and cost, using checked references | Require human approval and revision before questions enter the bank |
+| DeepSeek can power a standalone custom frontend | End-to-end spike: session creation, prompt streaming, cancellation, resume, model switching and permission-checked tool actions | Use a thin secure server adapter; evaluate Pi if runtime integration proves unsuitable |
+| Study data remains correct when AI fails or a session changes | Persist/reload session sets, bank selections, question revisions, attempts, optional AI solutions and source versions; test failure/retry paths | Keep deterministic application services and storage independent from model execution |
+| Grounded questions are reliable and traceable | Compare full-document and retrieved-excerpt generation for answerability, correctness, repetition, editing effort, latency and cost, using checked references | Keep learner-led bank selection and question editing, with visible source references and validity checks |
 | Question-set selection meets requested constraints | Compare random and constrained assembly for coverage, repetition, feasibility, reproducibility and assembly time | Explain infeasible requests and return reviewable alternatives rather than silently relaxing constraints |
 | UI components work with Persian and English content | Test responsive layouts, keyboard navigation, RTL/LTR mixtures and streaming mathematical content | Adapt or replace individual components while retaining the custom UI |
 | The first implementation exceeds the semester scope | Deliver one narrow, text-only subject flow with MCQ and short-answer practice first | Defer advanced coordinator, calendar, integrations and mind-map features |
 
-The Semester-2 implementation should begin with one complete **upload → source-linked question draft → review/approval → practice → scoring/feedback → saved result** flow. Expansion follows only after this core flow and the required evaluation can be demonstrated.
+The Semester-2 implementation should first demonstrate **add study sources → learn with AI → create a named question set in chat → answer and discuss questions → optionally select a set/subset for the Question Bank → revisit saved attempts and feedback**. Start with one learner, one subject, text sources, MCQ and short-answer questions; validate key technical boundaries and the required evaluation comparisons before wider features.
 
 Technical decision background: [harness selection, alternatives and sources](https://github.com/isOxygen/thesis-2026-workspace/tree/main/01-study-platform-tech-stack).
