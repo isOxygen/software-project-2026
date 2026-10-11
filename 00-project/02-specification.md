@@ -2,7 +2,8 @@
 name: Mohammadhossein Zare
 neptun: DJSAMS
 id: 2026_SD_03
-phase: 1
+project_outline: "[[00-project/01-project-outline]]"
+phase: 1-and-2
 status: draft-for-supervisor-review
 ---
 
@@ -1337,23 +1338,56 @@ The purpose of supervisor feedback is to validate the direction and suggest scop
 
 # Phase 2 — Initial Technical Specification Proposal
 
-> **Reserved for Phase 2.**
+> **Proposed direction, not a finalized implementation design.** The initial goal is to reuse the existing AI runtime while building a separate, study-specific application and interface. Technology choices that have not been validated remain candidates.
 
-The technical phase will define and justify topics such as:
+## Proposed solution
 
-- frontend/backend technologies;
-- persistence/database design;
-- file/object storage;
-- retrieval and source-grounding implementation;
-- memory implementation;
-- context-window and compaction strategy;
-- optional lightweight semantic classification/routing;
-- model/provider abstraction and switching;
-- skill/MCP/tool integration;
-- revision/versioning mechanisms;
-- authentication/security;
-- deployment architecture;
-- evaluation instrumentation;
-- fallback and failure-handling strategies.
+A responsive web application will provide the learner-facing experience. Its UI will be developed independently of DeepSeek Harness's existing interface. The study application will own its domain logic and persistent objects, while **DeepSeek Harness** is the first-choice runtime for model interaction, streaming, sessions, tools, and context management. **Pi** is the runtime fallback.
 
-No technical choice in this section is considered decided yet.
+The product must still implement its own study-specific behavior: source/document versions; topic and study-unit links; editable question drafts and **explicit approval before entry into the exercise bank**; question validation and near-duplicate handling; deterministic MCQ scoring; criterion-based, uncertainty-aware short-answer feedback; saved attempts; source-change impact analysis; and reproducible question-set assembly. Existing harness features do not replace these responsibilities.
+
+## Technology direction
+
+| Area | Candidate technology / approach | Reason for consideration | Open question / risk |
+| --- | --- | --- | --- |
+| Frontend | Next.js, React 19, TypeScript | Custom responsive web application; typed components and interfaces | Exact routing and deployment arrangement still open |
+| Visual system | Tailwind CSS v4 and [Beautiful UI](https://www.beautifului.dev/); Motion where useful | Full control over the product's UI; reusable, editable AI-facing components | Beautiful UI is a presentation layer, not the agent backend; validate accessibility, component licenses, RTL and mobile layouts |
+| Additional UI components | shadcn / Base UI only for gaps | Avoid maintaining two competing UI systems | Check each component's dependencies and styling compatibility |
+| AI runtime | [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness); Pi fallback | Reuse its modular session, tool, provider, streaming, and context infrastructure | Developer-preview maturity; verify upgrade, interruption and approval behavior |
+| Frontend–runtime integration | Prefer DeepSeek's native typed Client/API Gateway and event streams; thin server-side adapter if needed | Avoid adding a second protocol without a demonstrated need | Verify a standalone Next.js client can consume the selected interfaces safely; AG-UI is not an initial requirement |
+| Model providers | Harness-managed, configurable adapters | Application state remains independent of any single model/provider | Only providers supported and tested by the chosen integration can be promised |
+| Persistent study data | Application-owned relational data store (PostgreSQL candidate; SQLite acceptable for a prototype), with separate file storage | Stable identity, revision history, saved attempts and source dependencies | Schema, storage hosting and authentication still to be selected |
+| Source grounding | Versioned document processing and selective retrieval with source references | Compare full-source versus retrieved-context generation without losing traceability | Retrieval quality, changed-source invalidation, cost and latency |
+| Rendering and workspace tooling | Streaming Markdown renderer such as Streamdown when needed; pnpm for packages | Text, code and mathematical content; manageable TypeScript dependencies | Test mixed RTL/LTR rendering; a monorepo tool such as Turborepo is optional |
+
+## Initial architecture sketch
+
+```mermaid
+flowchart LR
+    U[Learner: desktop or mobile] --> UI[Custom Next.js UI]
+    UI --> API[Typed client / secure API adapter]
+    API --> S[Study application services]
+    S <--> DB[(Study records and source versions)]
+    S <--> FS[(Source file storage)]
+    S <--> H[DeepSeek Harness runtime]
+    H <--> M[Configured model providers]
+    H <--> T[Permitted tools and retrieval]
+
+```
+
+Study services own approval policy, deterministic scoring, question-bank state and source dependencies. The harness manages AI execution. Access-control checks must be enforced in application/runtime code, not only in prompts.
+
+## Feasibility, evaluation and technical risks
+
+| Risk / assumption | Validation planned for Semester 2 | Fallback approach |
+| --- | --- | --- |
+| DeepSeek can power a standalone custom frontend | End-to-end spike: session creation, prompt streaming, cancellation, resume, model switching and tool/approval events | Use a thin secure server adapter; evaluate Pi if runtime integration proves unsuitable |
+| Study data remains correct when AI fails or a session changes | Persist and reload questions, approvals, attempts and source versions; test failure/retry paths | Keep deterministic application services and storage independent from model execution |
+| Grounded questions are reliable and traceable | Compare full-document and retrieved-excerpt generation for answerability, correctness, repetition, editing effort, latency and cost, using checked references | Require human approval and revision before questions enter the bank |
+| Question-set selection meets requested constraints | Compare random and constrained assembly for coverage, repetition, feasibility, reproducibility and assembly time | Explain infeasible requests and return reviewable alternatives rather than silently relaxing constraints |
+| UI components work with Persian and English content | Test responsive layouts, keyboard navigation, RTL/LTR mixtures and streaming mathematical content | Adapt or replace individual components while retaining the custom UI |
+| The first implementation exceeds the semester scope | Deliver one narrow, text-only subject flow with MCQ and short-answer practice first | Defer advanced coordinator, calendar, integrations and mind-map features |
+
+The Semester-2 implementation should begin with one complete **upload → source-linked question draft → review/approval → practice → scoring/feedback → saved result** flow. Expansion follows only after this core flow and the required evaluation can be demonstrated.
+
+Technical decision background: [harness selection, alternatives and sources](https://github.com/isOxygen/thesis-2026-workspace/tree/main/01-study-platform-tech-stack).
